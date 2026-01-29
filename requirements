@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+orjson
+SQLAlchemy
+jinja2
+rq
+redis
+openai
+vllm

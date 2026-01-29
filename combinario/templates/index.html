@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>combinario</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="topbar">
+      <a class="title" title="combinario">&#127758; combinario</a>
+    </div>
+    <div class="sidenav">
+      <div class="items-container">
+        <div
+          class="item"
+          draggable="true"
+          item-text="Water"
+          item-emoji="💧"
+          item-id="0"
+        >
+          <span class="item-emoji">💧</span>
+          Water
+        </div>
+        <div
+          class="item"
+          draggable="true"
+          item-text="Fire"
+          item-emoji="🔥"
+          item-id="1"
+        >
+          <span class="item-emoji">🔥</span>
+          Fire
+        </div>
+        <div
+          class="item"
+          draggable="true"
+          item-text="Earth"
+          item-emoji="🌍"
+          item-id="2"
+        >
+          <span class="item-emoji">🌍</span>
+          Earth
+        </div>
+        <div
+          class="item"
+          draggable="true"
+          item-text="Wind"
+          item-emoji="🌍"
+          item-id="3"
+        >
+          <span class="item-emoji">🌬️</span>
+          Wind
+        </div>
+      </div>
+      <div class="searchbar">
+        <input type="text" placeholder="Search items..." />
+      </div>
+    </div>
+    <div class="workspace"></div>
+    <script src="{{ url_for('static', path='js/items.js') }}"></script>
+  </body>
+</html>
