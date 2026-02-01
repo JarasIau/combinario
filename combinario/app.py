@@ -1,11 +1,12 @@
 import os
 import logging
 import orjson
-from dbmanager.dbmanager import DBManager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from dbmanager.dbmanager import DBManager
+from dbmanager.schemas import ItemSchema, ParentSchema
 
 
 app = FastAPI(
@@ -24,7 +25,10 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(levelname)s: %(message)s")
 logger.setLevel(logging.INFO)
 
-dbm: DBManager = None
+
+def get_dbm(request: Request) -> DBManager:
+    return request.app.state.dbm
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -36,25 +40,24 @@ async def fetch_task(task_id: int):
     pass
 
 
-@app.get("/items/{first}/{second}")
-def fetch_item(first: int, second: int):
-    item = dbm.query(first=first, second=second)
-    if item:
-        return {"id": item.id, "emoji": item.emoji, "text": item.text}
-    """delegate to vllm"""
+@app.get("/items/{first}/{second}", response_model=ItemSchema)
+def fetch_item(first: int, second: int, dbm: DBManager = Depends(get_dbm)):
+    parent = ParentSchema(first=first, second=second)
+    item_resp = dbm.query(parent)
+    if item_resp:
+        return ItemSchema.model_validate(item_resp)
+    """TODO: delegate to vllm"""
 
 
 @app.on_event("startup")
 async def startup():
-    global dbm
-
     db_path = os.getenv("DB_PATH")
-    dbm = DBManager(db_path=db_path)
+    app.state.dbm = DBManager(db_path=db_path)
 
-    """vllm init"""
-    """redis init"""
+    """TODO: vllm init"""
+    """TODO: redis init"""
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    dbm.close()
+    app.state.dbm.close()

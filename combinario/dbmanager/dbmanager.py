@@ -1,47 +1,56 @@
 from tables import Item, Parent
+from schemas import ItemSchema, ParentSchema
 from sqlalchemy import create_engine, select, inspect
 from sqlalchemy.orm import Session
 
 
 class DBManager:
     def __init__(self, db_path: str):
-        self.engine = create_engine(f"sqlite://{db_path}", echo=True)
+        self.engine = create_engine(f"sqlite:///{db_path}", echo=True)
 
         if not self._tables_exist():
             from tables import Base
+
             Base.metadata.create_all(self.engine)
 
     def close(self):
         self.engine.dispose()
 
-    def add_item(self, text: str, emoji: str, parents: list[tuple[int, int]]) -> int:
+    def add_item(self, item_data: ItemSchema) -> int:
         with Session(self.engine) as session:
-            item = Item(emoji=emoji, text=text)
-            for first, second in parents:
+            item = Item(emoji=item_data.emoji, text=item_data.text)
+            for first, second in item_data.parents:
                 parent = Parent(first=first, second=second)
                 item.parents.append(parent)
             session.add(item)
             session.commit()
+            session.refresh()
             return item.id
 
-    def add_parent(self, item_id: int, first: int, second: int) -> bool:
+    def add_parent(self, parent_data: ParentSchema) -> bool:
         with Session(self.engine) as session:
-            item = session.get(Item, item_id)
+            item = session.get(Item, parent_data.item_id)
             if item:
-                parent = Parent(first=first, second=second)
+                parent = Parent(first=parent_data.first, second=parent_data.second)
                 item.parents.append(parent)
                 session.commit()
                 return True
             return False
 
-    def query(self, first: int, second: int) -> Item | None:
+    def query(self, parent_data: ParentSchema) -> Item | None:
         with Session(self.engine) as session:
             stmt = (
                 select(Item)
                 .join(Item.parents)
-                .where(Parent.first == first, Parent.second == second)
+                .where(
+                    Parent.first == parent_data.first,
+                    Parent.second == parent_data.second,
+                )
             )
-            return session.execute(stmt).scalar_one_or_none()
+            result = session.execute(stmt).scalar_one_or_none()
+            if result:
+                session.refresh(result, ["parents"])
+            return result
 
     def _tables_exist(self) -> bool:
         inspector = inspect(self.engine)
