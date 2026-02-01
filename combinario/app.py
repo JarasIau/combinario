@@ -35,11 +35,6 @@ async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
 
-@app.get("/task/{task_id}")
-async def fetch_task(task_id: int):
-    pass
-
-
 @app.get("/items/{first}/{second}", response_model=ItemSchema)
 def fetch_item(first: int, second: int, dbm: DBManager = Depends(get_dbm)):
     parent = ParentSchema(first=first, second=second)
@@ -47,6 +42,11 @@ def fetch_item(first: int, second: int, dbm: DBManager = Depends(get_dbm)):
     if item_resp:
         return ItemSchema.model_validate(item_resp)
     """TODO: delegate to vllm"""
+
+
+@app.get("/task/{task_id}")
+async def fetch_task(task_id: int):
+    """TODO: fetch an ongoing job from redis"""
 
 
 @app.on_event("startup")

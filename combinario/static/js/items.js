@@ -13,12 +13,12 @@ class ItemManager {
     this.offsetX = 0;
     this.offsetY = 0;
     this.allSpawnedItems = new Set();
-    
+
     this.workspaceSelector = workspaceSelector;
     this.sidenavSelector = sidenavSelector;
     this.workspace = null;
     this.sidenav = null;
-    
+
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
   }
@@ -224,8 +224,10 @@ class ItemManager {
       const workspaceRect = this.workspace.getBoundingClientRect();
 
       this.workspace.appendChild(this.currentDraggedItem);
-      this.currentDraggedItem.style.left = itemRect.left - workspaceRect.left + "px";
-      this.currentDraggedItem.style.top = itemRect.top - workspaceRect.top + "px";
+      this.currentDraggedItem.style.left =
+        itemRect.left - workspaceRect.left + "px";
+      this.currentDraggedItem.style.top =
+        itemRect.top - workspaceRect.top + "px";
       this.currentDraggedItem.style.zIndex = "";
       this.currentDraggedItem.style.pointerEvents = "auto";
 
@@ -244,7 +246,8 @@ class ItemManager {
 
   cleanup() {
     if (this.currentDraggedItem) {
-      this.currentDraggedItem.style.transition = "border-color 0.2s, transform 0.2s";
+      this.currentDraggedItem.style.transition =
+        "border-color 0.2s, transform 0.2s";
       this.currentDraggedItem.style.zIndex = "";
     }
     this.isDragging = false;
@@ -328,10 +331,14 @@ class ItemManager {
       return;
     }
 
-    document.querySelectorAll(`${this.sidenavSelector} .item`).forEach((item) => {
-      item.addEventListener("mousedown", (e) => this.handleSidebarMouseDown(e));
-      item.addEventListener("click", (e) => this.handleSidebarClick(e));
-    });
+    document
+      .querySelectorAll(`${this.sidenavSelector} .item`)
+      .forEach((item) => {
+        item.addEventListener("mousedown", (e) =>
+          this.handleSidebarMouseDown(e),
+        );
+        item.addEventListener("click", (e) => this.handleSidebarClick(e));
+      });
 
     const searchInput = document.querySelector('.searchbar input[type="text"]');
     if (searchInput) {
@@ -339,11 +346,13 @@ class ItemManager {
         "input",
         this.debounce((e) => {
           const term = e.target.value.toLowerCase();
-          document.querySelectorAll(`${this.sidenavSelector} .item`).forEach((item) => {
-            item.style.display = item.textContent.toLowerCase().includes(term)
-              ? "flex"
-              : "none";
-          });
+          document
+            .querySelectorAll(`${this.sidenavSelector} .item`)
+            .forEach((item) => {
+              item.style.display = item.textContent.toLowerCase().includes(term)
+                ? "flex"
+                : "none";
+            });
         }, this.CONFIG.DEBOUNCE_MS),
       );
     }
