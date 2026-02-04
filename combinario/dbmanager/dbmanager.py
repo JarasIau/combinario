@@ -37,7 +37,15 @@ class DBManager:
                 return True
             return False
 
-    def query(self, parent_data: ParentSchema) -> Item | None:
+    def query_item(self, item_id: int) -> Item | None:
+        with Session(self.engine) as session:
+            stmt = select(Item).where(Item.id == item_id)
+            result = session.execute(stmt).scalar_one_or_none()
+            if result:
+                session.refresh(result, ["parents"])
+            return result
+
+    def query_by_parents(self, parent_data: ParentSchema) -> Item | None:
         with Session(self.engine) as session:
             stmt = (
                 select(Item)
