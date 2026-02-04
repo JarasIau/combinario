@@ -14,6 +14,7 @@ class ItemManager {
     this.offsetX = 0;
     this.offsetY = 0;
     this.allSpawnedItems = new Set();
+    this.pendingJobs = new Map();
 
     this.workspaceSelector = workspaceSelector;
     this.sidenavSelector = sidenavSelector;
@@ -98,6 +99,8 @@ class ItemManager {
           placeholder.setAttribute("item-emoji", result.item.emoji);
           placeholder.setAttribute("item-text", result.item.text);
           placeholder.style.borderColor = "";
+
+          this.addToSidebar(result.item);
         }
       }
     }, this.CONFIG.POLL_INTERVAL);
@@ -221,6 +224,8 @@ class ItemManager {
             placeholder.setAttribute("item-id", result.item.id);
             placeholder.setAttribute("item-emoji", result.item.emoji);
             placeholder.setAttribute("item-text", result.item.text);
+
+            this.addToSidebar(result.item);
           } else {
             placeholder.textContent = "❌ Error";
             placeholder.style.borderColor = "red";
@@ -234,6 +239,38 @@ class ItemManager {
     if (!hasCollision) {
       draggedItem.style.borderColor = "";
       draggedItem.style.transform = "";
+    }
+  }
+
+  addToSidebar(item) {
+    const existingItem = document.querySelector(
+      `${this.sidenavSelector} .item[item-id="${item.id}"]`,
+    );
+
+    if (existingItem) {
+      return;
+    }
+
+    const sidebarItem = document.createElement("div");
+    sidebarItem.className = "item";
+    sidebarItem.setAttribute("draggable", "true");
+    sidebarItem.setAttribute("item-id", item.id);
+    sidebarItem.setAttribute("item-emoji", item.emoji);
+    sidebarItem.setAttribute("item-text", item.text);
+    sidebarItem.innerHTML = `<span class="item-emoji">${item.emoji}</span> ${item.text}`;
+
+    sidebarItem.addEventListener("mousedown", (e) =>
+      this.handleSidebarMouseDown(e),
+    );
+    sidebarItem.addEventListener("click", (e) => this.handleSidebarClick(e));
+
+    const itemsContainer = document.querySelector(
+      `${this.sidenavSelector} .items-container`,
+    );
+    if (itemsContainer) {
+      itemsContainer.appendChild(sidebarItem);
+
+      sidebarItem.style.animation = "fadeIn 0.3s ease-in";
     }
   }
 

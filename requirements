@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 orjson
 SQLAlchemy
+psycopg2-binary
 jinja2
 arq
 openai

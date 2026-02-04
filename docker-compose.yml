@@ -1,0 +1,93 @@
+services:
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:full
+    container_name: llama_cpp
+    env_file:
+      - .env
+    command: >
+      --server
+      -m /models/${LLM_MODEL}
+      --port 8000
+      --host 0.0.0.0
+      --n-gpu-layers 0
+      --ctx-size 2048
+    volumes:
+      - ./models:/models
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: app_db
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT}:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: app_redis
+    env_file:
+      - .env
+    ports:
+      - "${REDIS_PORT}:6379"
+    restart: unless-stopped
+
+  seed:
+    build: .
+    container_name: db_seed
+    env_file:
+      - .env
+    depends_on:
+      - db
+    environment:
+      DB_PATH: ${DB_PATH}
+    command: python seed.py
+    restart: "no"
+
+  app:
+    build: .
+    container_name: app_combinario
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+      - llama
+    environment:
+      DATABASE_URL: ${DB_URL}
+      REDIS_URL: "redis://${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}"
+      LLAMA_BASE_URL: "${LLM_BASE_URL}"
+      OPEN_AI_API_KEY: "${OPEN_AI_API_KEY}"
+    ports:
+      - "8080:8080"
+    command: uvicorn app:app --host 0.0.0.0 --port 8080 --reload
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: arq_worker
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - db
+      - llama
+    environment:
+      DATABASE_URL: ${DB_URL}
+      REDIS_URL: "redis://${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}"
+      LLAMA_BASE_URL: "${LLM_BASE_URL}"
+      OPEN_AI_API_KEY: "${OPEN_AI_API_KEY}"
+    command: arq worker.WorkerSettings
+    restart: unless-stopped
+
+volumes:
+  pgdata:

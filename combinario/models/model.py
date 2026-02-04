@@ -30,7 +30,7 @@ class OpenAI:
         Example: Fire + Water → 💨Steam"""
 
     async def generate(self, prompt: str) -> str:
-        response = await self.client.responses.create(
+        response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": self.base_prompt},

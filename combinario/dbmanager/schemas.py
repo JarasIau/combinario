@@ -16,3 +16,6 @@ class ItemSchema(BaseModel):
     text: str = Field(..., min_length=1)
 
     parents: list[ParentSchema] = Field(default_factory=list)
+
+class JobSchema(BaseModel):
+    enqueued: str = Field(..., min_length=1)

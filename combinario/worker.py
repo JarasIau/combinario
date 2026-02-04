@@ -27,12 +27,12 @@ async def generate_task(ctx: dict, prompt: str, first: int, second: int) -> Item
 
 async def startup(ctx: dict) -> None:
     ctx["openai_client"] = OpenAI(
-        base_url=os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1"),
+        base_url=os.getenv("LLM_BASE_URL", "http://localhost:8000/v1"),
         api_key=os.getenv("OPENAI_API_KEY", "EMPTY"),
         max_tokens=int(os.getenv("MAX_TOKENS", 20)),
         temperature=float(os.getenv("MODEL_TEMPERATURE", 0.7)),
     )
-    ctx["dbm"] = DBManager(db_path=os.getenv("DB_PATH", ":memory:"))
+    ctx["dbm"] = DBManager(db_path=os.getenv("DB_URL", "sqlite:///:memory:"))
     logging.info("ARQ worker created")
 
 

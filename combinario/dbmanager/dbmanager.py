@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 class DBManager:
     def __init__(self, db_path: str):
-        self.engine = create_engine(f"sqlite:///{db_path}", echo=True)
+        self.engine = create_engine(db_path, echo=True)
 
         if not self._tables_exist():
             from .tables import Base
@@ -19,12 +19,13 @@ class DBManager:
     def add_item(self, item_data: ItemSchema) -> int:
         with Session(self.engine) as session:
             item = Item(emoji=item_data.emoji, text=item_data.text)
-            for first, second in item_data.parents:
+            for parent_data in item_data.parents:
+                first, second = sorted((parent_data.first, parent_data.second))
                 parent = Parent(first=first, second=second)
                 item.parents.append(parent)
             session.add(item)
             session.commit()
-            session.refresh()
+            session.refresh(item)
             return item.id
 
     def add_parent(self, parent_data: ParentSchema) -> bool:
@@ -47,12 +48,13 @@ class DBManager:
 
     def query_by_parents(self, parent_data: ParentSchema) -> Item | None:
         with Session(self.engine) as session:
+            first, second = sorted((parent_data.first, parent_data.second))
             stmt = (
                 select(Item)
                 .join(Item.parents)
                 .where(
-                    Parent.first == parent_data.first,
-                    Parent.second == parent_data.second,
+                    Parent.first == first,
+                    Parent.second == second,
                 )
             )
             result = session.execute(stmt).scalar_one_or_none()
