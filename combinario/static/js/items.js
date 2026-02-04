@@ -5,6 +5,7 @@ class ItemManager {
       ITEM_HEIGHT: 38,
       SPACING: 140,
       DEBOUNCE_MS: 150,
+      POLL_INTERVAL: 1000,
     };
 
     this.isDragging = false;
@@ -42,6 +43,64 @@ class ItemManager {
       rect1.bottom < rect2.top ||
       rect1.top > rect2.bottom
     );
+  }
+
+  async combineItems(firstId, secondId) {
+    try {
+      const response = await fetch(`/items/${firstId}/${secondId}`);
+      const data = await response.json();
+
+      if (data.enqueued) {
+        return { jobId: data.enqueued };
+      } else {
+        return { item: data };
+      }
+    } catch (error) {
+      console.error("Error combining items:", error);
+      return null;
+    }
+  }
+
+  async pollJob(jobId) {
+    try {
+      const response = await fetch(`/task/${jobId}`);
+      const data = await response.json();
+
+      if (data.status === "complete") {
+        return { done: true, item: data.result };
+      } else if (data.status === "failed") {
+        return { done: true, error: true };
+      } else {
+        return { done: false };
+      }
+    } catch (error) {
+      console.error("Error polling job:", error);
+      return { done: true, error: true };
+    }
+  }
+
+  startPolling(jobId, placeholder) {
+    this.pendingJobs.set(jobId, placeholder);
+
+    const pollInterval = setInterval(async () => {
+      const result = await this.pollJob(jobId);
+
+      if (result.done) {
+        clearInterval(pollInterval);
+        this.pendingJobs.delete(jobId);
+
+        if (result.error) {
+          placeholder.textContent = "❌ Error";
+          placeholder.style.borderColor = "red";
+        } else if (result.item) {
+          placeholder.innerHTML = `<span class="item-emoji">${result.item.emoji}</span> ${result.item.text}`;
+          placeholder.setAttribute("item-id", result.item.id);
+          placeholder.setAttribute("item-emoji", result.item.emoji);
+          placeholder.setAttribute("item-text", result.item.text);
+          placeholder.style.borderColor = "";
+        }
+      }
+    }, this.CONFIG.POLL_INTERVAL);
   }
 
   findNearbyEmptyPosition() {
@@ -136,6 +195,9 @@ class ItemManager {
         const placeholderX = itemRect.left - workspaceRect.left;
         const placeholderY = itemRect.top - workspaceRect.top;
 
+        const firstId = parseInt(draggedItem.getAttribute("item-id"));
+        const secondId = parseInt(item.getAttribute("item-id"));
+
         this.allSpawnedItems.delete(draggedItem);
         this.allSpawnedItems.delete(item);
         draggedItem.remove();
@@ -143,13 +205,28 @@ class ItemManager {
 
         const placeholder = document.createElement("div");
         placeholder.className = "item spawned-item";
-        placeholder.textContent = "✨ Placeholder";
+        placeholder.textContent = "⏳ Loading...";
         placeholder.style.cssText = `position:absolute;left:${placeholderX}px;top:${placeholderY}px;width:${this.CONFIG.ITEM_WIDTH}px;cursor:move;transition:border-color 0.2s, transform 0.2s`;
         placeholder.dataset.initialized = "true";
 
         this.workspace.appendChild(placeholder);
         this.allSpawnedItems.add(placeholder);
         this.makeSpawnedItemDraggable(placeholder);
+
+        this.combineItems(firstId, secondId).then((result) => {
+          if (result.jobId) {
+            this.startPolling(result.jobId, placeholder);
+          } else if (result.item) {
+            placeholder.innerHTML = `<span class="item-emoji">${result.item.emoji}</span> ${result.item.text}`;
+            placeholder.setAttribute("item-id", result.item.id);
+            placeholder.setAttribute("item-emoji", result.item.emoji);
+            placeholder.setAttribute("item-text", result.item.text);
+          } else {
+            placeholder.textContent = "❌ Error";
+            placeholder.style.borderColor = "red";
+          }
+        });
+
         break;
       }
     }
