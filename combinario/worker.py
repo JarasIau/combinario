@@ -32,7 +32,7 @@ async def startup(ctx: dict) -> None:
         max_tokens=int(os.getenv("MAX_TOKENS", 20)),
         temperature=float(os.getenv("MODEL_TEMPERATURE", 0.7)),
     )
-    ctx["dbm"] = DBManager(db_path=os.getenv("DB_PATH"))
+    ctx["dbm"] = DBManager(db_path=os.getenv("DB_PATH", ":memory:"))
     logging.info("ARQ worker created")
 
 

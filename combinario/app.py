@@ -15,13 +15,13 @@ from dbmanager.schemas import ItemSchema, ParentSchema
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.dbm = DBManager(db_path=os.getenv("DB_PATH"))
+    app.state.dbm = DBManager(db_path=os.getenv("DB_PATH", ":memory:"))
 
     redis_conn = RedisSettings(
         host=os.getenv("REDIS_HOST", "localhost"),
         port=int(os.getenv("REDIS_PORT", 6379)),
     )
-    app.state.arq_pool: ArqRedis = await create_pool(connection=redis_conn)
+    app.state.arq_pool: ArqRedis = await create_pool(redis_conn)
     yield
     await app.state.arq_pool.close()
     app.state.dbm.close()
@@ -59,7 +59,7 @@ async def index(request: Request):
 
 
 @app.get("/items/{first}/{second}", response_model=ItemSchema)
-def fetch_item(
+async def fetch_item(
     first: int,
     second: int,
     dbm: DBManager = Depends(get_dbm),

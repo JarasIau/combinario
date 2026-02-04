@@ -1,5 +1,5 @@
-from tables import Item, Parent
-from schemas import ItemSchema, ParentSchema
+from .tables import Item, Parent
+from .schemas import ItemSchema, ParentSchema
 from sqlalchemy import create_engine, select, inspect
 from sqlalchemy.orm import Session
 
@@ -9,7 +9,7 @@ class DBManager:
         self.engine = create_engine(f"sqlite:///{db_path}", echo=True)
 
         if not self._tables_exist():
-            from tables import Base
+            from .tables import Base
 
             Base.metadata.create_all(self.engine)
 
