@@ -46,7 +46,7 @@ async def shutdown(ctx: dict) -> None:
 class WorkerSettings:
     functions = [generate_task]
     on_startup = startup
-    on_shutdow = shutdown
+    on_shutdown = shutdown
 
     redis_settings = RedisSettings(
         host=os.getenv("REDIS_HOST", "localhost"),

@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ParentSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     first: int = Field(..., ge=0)
     second: int = Field(..., ge=0)
 
@@ -18,6 +18,7 @@ class ItemSchema(BaseModel):
     text: str = Field(..., min_length=1)
 
     parents: list[ParentSchema] = []
+
 
 class JobSchema(BaseModel):
     enqueued: str = Field(..., min_length=1)
