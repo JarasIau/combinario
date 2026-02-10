@@ -11,10 +11,21 @@
       rel="stylesheet"
       href="{{ url_for('static', path='css/style.css') }}"
     />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="512x512"
+      href="{{ url_for('static', path='icons/512.png') }}"
+    />
   </head>
   <body>
     <div class="topbar">
-      <a class="title" title="combinario">&#127758; combinario</a>
+      <img
+        src="{{ url_for('static', path='icons/512.png') }}"
+        class="logo"
+        alt="🌍"
+      />
+      <span class="title" title="combinario">combinario</span>
     </div>
     <div class="sidenav">
       <div class="items-container">
