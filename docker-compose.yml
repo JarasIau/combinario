@@ -1,11 +1,10 @@
 services:
   llama:
-    image: ghcr.io/ggml-org/llama.cpp:full
+    image: ghcr.io/ggml-org/llama.cpp:server
     container_name: llama_cpp
     env_file:
       - .env
     command: >
-      --server
       -m /models/${LLM_MODEL}
       --port 8000
       --host 0.0.0.0

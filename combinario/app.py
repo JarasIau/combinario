@@ -73,7 +73,7 @@ async def fetch_item(
     first_parent = dbm.query_item(first)
     second_parent = dbm.query_item(second)
     if not first_parent or not second_parent:
-        raise HTTPException(status_code=404, detail="Job not found!")
+        raise HTTPException(status_code=404, detail="Item not found!")
     prompt = f"{first_parent.text} + {second_parent.text}"
     job = await arq_pool.enqueue_job("generate_task", prompt, first, second)
     return JobSchema(enqueued=job.job_id)
@@ -88,6 +88,7 @@ async def fetch_task(job_id: str, arq_pool: ArqRedis = Depends(get_arq)):
     if status == JobStatus.complete:
         try:
             return {"status": "complete", "result": await job.result()}
-        except Exception:
+        except Exception as e:
+            logger.error(e)
             return {"status": "failed"}
     return {"status": "running"}
