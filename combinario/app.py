@@ -92,3 +92,8 @@ async def fetch_task(job_id: str, arq_pool: ArqRedis = Depends(get_arq)):
             logger.error(e)
             return {"status": "failed"}
     return {"status": "running"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
