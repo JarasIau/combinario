@@ -29,7 +29,7 @@ class OpenAI:
         - Stop after the result. 
         Example: Fire + Water → 💨Steam"""
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str) -> str | None:
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[

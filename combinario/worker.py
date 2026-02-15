@@ -1,18 +1,23 @@
-import os
 import logging
+from typing import Any
 from arq.connections import RedisSettings
 from dbmanager.dbmanager import DBManager
 from dbmanager.schemas import ItemSchema, ParentSchema
 from models.model import OpenAI
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 
-async def generate_task(ctx: dict, prompt: str, first: int, second: int) -> ItemSchema:
+async def generate_task(
+    ctx: dict[str, Any], prompt: str, first: int, second: int
+) -> ItemSchema:
     openai_client = ctx["openai_client"]
     dbm = ctx["dbm"]
     logger.info(f"Generating {prompt}")
     result = await openai_client.generate(prompt)
+    if not result:
+        raise Exception("Empty LLM response")
     try:
         emoji, text = result.split(maxsplit=1)
     except ValueError:
@@ -25,18 +30,18 @@ async def generate_task(ctx: dict, prompt: str, first: int, second: int) -> Item
     return item
 
 
-async def startup(ctx: dict) -> None:
+async def startup(ctx: dict[str, Any]) -> None:
     ctx["openai_client"] = OpenAI(
-        base_url=os.getenv("LLM_BASE_URL", "http://localhost:8000/v1"),
-        api_key=os.getenv("OPENAI_API_KEY", "EMPTY"),
-        max_tokens=int(os.getenv("MAX_TOKENS", 20)),
-        temperature=float(os.getenv("MODEL_TEMPERATURE", 0.7)),
+        base_url=settings.llm_base_url,
+        api_key=settings.open_ai_api_key,
+        max_tokens=settings.max_tokens,
+        temperature=settings.model_temperature,
     )
-    ctx["dbm"] = DBManager(db_path=os.getenv("DB_URL", "sqlite:///:memory:"))
+    ctx["dbm"] = DBManager(db_path=settings.db_url, debug=settings.debug_mode)
     logging.info("ARQ worker created")
 
 
-async def shutdown(ctx: dict) -> None:
+async def shutdown(ctx: dict[str, Any]) -> None:
     dbm = ctx.get("dbm")
     if dbm:
         dbm.close()
@@ -49,6 +54,6 @@ class WorkerSettings:
     on_shutdown = shutdown
 
     redis_settings = RedisSettings(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", 6379)),
+        host=settings.redis_host,
+        port=settings.redis_port,
     )

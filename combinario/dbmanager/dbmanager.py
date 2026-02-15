@@ -1,3 +1,4 @@
+from typing import Any
 from .tables import Item, Parent
 from .schemas import ItemSchema, ParentSchema
 from sqlalchemy import create_engine, select, inspect
@@ -5,15 +6,21 @@ from sqlalchemy.orm import Session
 
 
 class DBManager:
-    def __init__(self, db_path: str):
-        self.engine = create_engine(db_path, echo=True)
+    def __init__(self, db_path: str, debug: bool = True):
+        self.engine = create_engine(db_path, echo=debug)
 
         if not self._tables_exist():
             from .tables import Base
 
             Base.metadata.create_all(self.engine)
 
-    def close(self):
+    def __enter__(self) -> "DBManager":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+    def close(self) -> None:
         self.engine.dispose()
 
     def add_item(self, item_data: ItemSchema) -> int:
@@ -38,14 +45,15 @@ class DBManager:
                 return True
             return False
 
-    def query_item(self, item_id: int) -> Item | None:
+    def query_item(self, item_id: int) -> ItemSchema | None:
         with Session(self.engine) as session:
             item = session.get(Item, item_id)
             if item:
                 session.refresh(item, ["parents"])
-            return item
+                return ItemSchema.model_validate(item)
+            return None
 
-    def query_by_parents(self, parent_data: ParentSchema) -> Item | None:
+    def query_by_parents(self, parent_data: ParentSchema) -> ItemSchema | None:
         with Session(self.engine) as session:
             first, second = sorted((parent_data.first, parent_data.second))
             stmt = (
@@ -59,7 +67,8 @@ class DBManager:
             result = session.execute(stmt).scalar_one_or_none()
             if result:
                 session.refresh(result, ["parents"])
-            return result
+                return ItemSchema.model_validate(result)
+            return None
 
     def _tables_exist(self) -> bool:
         inspector = inspect(self.engine)
