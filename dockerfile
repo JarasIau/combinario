@@ -11,4 +11,10 @@ RUN pip install --no-cache-dir -r requirements
 
 ENV PYTHONUNBUFFERED=1
 
-COPY combinario .
+RUN groupadd -r app && useradd -r -g app app
+
+RUN chown -R app:app /app
+
+COPY --chown=app:app combinario .
+
+USER app
