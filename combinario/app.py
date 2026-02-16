@@ -67,7 +67,7 @@ async def fetch_item(
     dbm: DBManager = Depends(get_dbm),
     arq_pool: ArqRedis = Depends(get_arq),
 ) -> Union[ItemSchema, JobSchema]:
-    if first < 1 or second < 1:
+    if not max(first, second, 0):
         raise HTTPException(status_code=422, detail="ID cannot be less than 1")
 
     parent = ParentSchema(first=first, second=second)
