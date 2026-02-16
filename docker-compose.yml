@@ -90,7 +90,7 @@ services:
       OPEN_AI_API_KEY: "${OPEN_AI_API_KEY}"
     ports:
       - "8080:8080"
-    command: uvicorn app:app --host 0.0.0.0 --port 8080 --reload
+    command: uvicorn app:app --host 0.0.0.0 --port 8080 --reload --loop uvloop --http httptools
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
