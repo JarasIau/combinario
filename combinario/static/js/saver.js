@@ -15,6 +15,17 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }
 
+  function setItemContent(element, emoji, text) {
+    element.textContent = "";
+
+    const emojiSpan = document.createElement("span");
+    emojiSpan.className = "item-emoji";
+    emojiSpan.textContent = emoji;
+
+    element.appendChild(emojiSpan);
+    element.appendChild(document.createTextNode(" " + text));
+  }
+
   function loadItems() {
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (!savedData) return;
@@ -32,7 +43,8 @@
       div.setAttribute("item-id", item.id);
       div.setAttribute("item-emoji", item.emoji);
       div.setAttribute("item-text", item.text);
-      div.innerHTML = `<span class="item-emoji">${item.emoji}</span> ${item.text}`;
+
+      setItemContent(div, item.emoji, item.text);
 
       if (window.ItemManager) {
         div.addEventListener("mousedown", (e) =>

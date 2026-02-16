@@ -80,6 +80,17 @@ class ItemManager {
     }
   }
 
+  setItemContent(element, emoji, text) {
+    element.textContent = "";
+
+    const emojiSpan = document.createElement("span");
+    emojiSpan.className = "item-emoji";
+    emojiSpan.textContent = emoji;
+
+    element.appendChild(emojiSpan);
+    element.appendChild(document.createTextNode(" " + text));
+  }
+
   startPolling(jobId, placeholder) {
     this.pendingJobs.set(jobId, placeholder);
 
@@ -94,7 +105,7 @@ class ItemManager {
           placeholder.textContent = "❌ Error";
           placeholder.style.borderColor = "red";
         } else if (result.item) {
-          placeholder.innerHTML = `<span class="item-emoji">${result.item.emoji}</span> ${result.item.text}`;
+          this.setItemContent(placeholder, result.item.emoji, result.item.text);
           placeholder.setAttribute("item-id", result.item.id);
           placeholder.setAttribute("item-emoji", result.item.emoji);
           placeholder.setAttribute("item-text", result.item.text);
@@ -220,7 +231,11 @@ class ItemManager {
           if (result.jobId) {
             this.startPolling(result.jobId, placeholder);
           } else if (result.item) {
-            placeholder.innerHTML = `<span class="item-emoji">${result.item.emoji}</span> ${result.item.text}`;
+            this.setItemContent(
+              placeholder,
+              result.item.emoji,
+              result.item.text,
+            );
             placeholder.setAttribute("item-id", result.item.id);
             placeholder.setAttribute("item-emoji", result.item.emoji);
             placeholder.setAttribute("item-text", result.item.text);
@@ -257,7 +272,8 @@ class ItemManager {
     sidebarItem.setAttribute("item-id", item.id);
     sidebarItem.setAttribute("item-emoji", item.emoji);
     sidebarItem.setAttribute("item-text", item.text);
-    sidebarItem.innerHTML = `<span class="item-emoji">${item.emoji}</span> ${item.text}`;
+
+    this.setItemContent(sidebarItem, item.emoji, item.text);
 
     sidebarItem.addEventListener("mousedown", (e) =>
       this.handleSidebarMouseDown(e),
