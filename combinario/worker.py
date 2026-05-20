@@ -29,8 +29,7 @@ async def generate_task(
     session_factory = ctx["session_factory"]
 
     logger.info(f"Generating {prompt}")
-    result = await openai_client.generate(prompt)
-    if not result:
+    if not (result := await openai_client.generate(prompt)):
         raise Exception("Empty LLM response")
 
     try:
@@ -65,8 +64,7 @@ async def startup(ctx: dict[str, Any]) -> None:
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
-    engine = ctx.get("engine")
-    if engine:
+    if engine := ctx.get("engine"):
         await engine.dispose()
     logger.info("ARQ worker shutdown")
 
