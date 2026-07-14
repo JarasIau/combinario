@@ -3,7 +3,6 @@
 .gitattributes
 
 docker-compose.yml
-Dockerfile
 .docker
 .dockerignore
 
@@ -11,9 +10,12 @@ Dockerfile
 **/*.py[cod]
 
 **/.ruff_cache/
+**/.mypy_cache/
+**/.pytest_cache/
 
 **/venv/
 **/.venv/
+node_modules/
 
 .env
 .env.example

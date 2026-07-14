@@ -2,10 +2,11 @@
 name = "combinario"
 version = "0.1.0"
 description = "merge two words and let AI create a brand-new concept."
+readme = "README.md"
 authors = [
     {name = "JarasIau",email = "jaraslau@tutanota.com"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "fastapi (>=0.128.0,<0.129.0)",

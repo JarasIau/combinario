@@ -75,9 +75,9 @@ app = FastAPI(
     json_loads=orjson.loads,
     default_response_class=ORJSONResponse,
     debug=db_settings.debug_mode,
-    docs_url=None,
+    docs_url="/docs" if db_settings.debug_mode else None,
     redoc_url=None,
-    openapi_url=None,
+    openapi_url="/openapi.json" if db_settings.debug_mode else None,
 )
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
