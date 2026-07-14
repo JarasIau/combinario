@@ -30,7 +30,14 @@
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (!savedData) return;
 
-    const items = JSON.parse(savedData);
+    let items;
+    try {
+      items = JSON.parse(savedData);
+    } catch (error) {
+      console.error("Failed to load saved items:", error);
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
     const itemsContainer = document.querySelector(".sidenav .items-container");
     if (!itemsContainer) return;
 
@@ -46,16 +53,8 @@
 
       setItemContent(div, item.emoji, item.text);
 
-      if (window.ItemManager) {
-        div.addEventListener("mousedown", (e) =>
-          window.ItemManager.handleSidebarMouseDown(e),
-        );
-        div.addEventListener("click", (e) =>
-          window.ItemManager.handleSidebarClick(e),
-        );
-      }
-
       itemsContainer.appendChild(div);
+      window.ItemManager?.setupSidebarItem(div);
     });
   }
 

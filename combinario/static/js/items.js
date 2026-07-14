@@ -6,6 +6,7 @@ class ItemManager {
       SPACING: 140,
       DEBOUNCE_MS: 150,
       POLL_INTERVAL: 1000,
+      BASE_ITEM_IDS: new Set(["1", "2", "3", "4"]),
     };
 
     this.isDragging = false;
@@ -15,6 +16,7 @@ class ItemManager {
     this.offsetY = 0;
     this.allSpawnedItems = new Set();
     this.pendingJobs = new Map();
+    this.sidebarEditMode = false;
 
     this.workspaceSelector = workspaceSelector;
     this.sidenavSelector = sidenavSelector;
@@ -106,14 +108,16 @@ class ItemManager {
   }
 
   startPolling(jobId, placeholder) {
-    this.pendingJobs.set(jobId, placeholder);
-
     const pollInterval = setInterval(async () => {
       const result = await this.pollJob(jobId);
 
       if (result.done) {
         clearInterval(pollInterval);
         this.pendingJobs.delete(jobId);
+
+        if (!this.workspace.contains(placeholder)) {
+          return;
+        }
 
         if (result.error) {
           placeholder.textContent = "❌ Error";
@@ -129,6 +133,8 @@ class ItemManager {
         }
       }
     }, this.CONFIG.POLL_INTERVAL);
+
+    this.pendingJobs.set(jobId, { placeholder, pollInterval });
   }
 
   findNearbyEmptyPosition() {
@@ -242,7 +248,14 @@ class ItemManager {
         this.makeSpawnedItemDraggable(placeholder);
 
         this.combineItems(firstId, secondId).then((result) => {
-          if (result.jobId) {
+          if (!this.workspace.contains(placeholder)) {
+            return;
+          }
+
+          if (!result) {
+            placeholder.textContent = "❌ Error";
+            placeholder.style.borderColor = "red";
+          } else if (result.jobId) {
             this.startPolling(result.jobId, placeholder);
           } else if (result.item) {
             this.setItemContent(
@@ -288,11 +301,7 @@ class ItemManager {
     sidebarItem.setAttribute("item-text", item.text);
 
     this.setItemContent(sidebarItem, item.emoji, item.text);
-
-    sidebarItem.addEventListener("mousedown", (e) =>
-      this.handleSidebarMouseDown(e),
-    );
-    sidebarItem.addEventListener("click", (e) => this.handleSidebarClick(e));
+    this.setupSidebarItem(sidebarItem);
 
     const itemsContainer = document.querySelector(
       `${this.sidenavSelector} .items-container`,
@@ -388,6 +397,103 @@ class ItemManager {
     this.cleanup();
   }
 
+  isBaseSidebarItem(item) {
+    return (
+      item.dataset.baseItem === "true" ||
+      this.CONFIG.BASE_ITEM_IDS.has(item.getAttribute("item-id"))
+    );
+  }
+
+  createRemoveButton() {
+    const button = document.createElement("button");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const firstPath = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "path",
+    );
+    const secondPath = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "path",
+    );
+
+    button.type = "button";
+    button.className = "sidebar-remove";
+    button.setAttribute("aria-label", "Remove item");
+    button.setAttribute("title", "Remove item");
+
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    firstPath.setAttribute("d", "M18 6 6 18");
+    secondPath.setAttribute("d", "m6 6 12 12");
+    svg.append(firstPath, secondPath);
+    button.appendChild(svg);
+
+    button.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.removeSidebarItem(e.currentTarget.closest(".item"));
+    });
+
+    return button;
+  }
+
+  setupSidebarItem(item) {
+    if (!item.dataset.sidebarReady) {
+      item.addEventListener("mousedown", (e) => this.handleSidebarMouseDown(e));
+      item.addEventListener("click", (e) => this.handleSidebarClick(e));
+      item.dataset.sidebarReady = "true";
+    }
+
+    if (this.isBaseSidebarItem(item)) {
+      item.dataset.baseItem = "true";
+      item.classList.remove("is-removable");
+      item.querySelector(".sidebar-remove")?.remove();
+      return;
+    }
+
+    item.classList.add("is-removable");
+    if (!item.querySelector(".sidebar-remove")) {
+      item.appendChild(this.createRemoveButton());
+    }
+  }
+
+  refreshSidebarItems() {
+    document
+      .querySelectorAll(`${this.sidenavSelector} .item`)
+      .forEach((item) => this.setupSidebarItem(item));
+  }
+
+  removeSidebarItem(item) {
+    if (!item || this.isBaseSidebarItem(item)) return;
+    item.remove();
+  }
+
+  setSidebarEditMode(enabled) {
+    this.sidebarEditMode = enabled;
+    this.sidenav?.classList.toggle("is-editing", enabled);
+    document
+      .querySelector('[data-action="toggle-sidebar-edit"]')
+      ?.classList.toggle("is-active", enabled);
+    this.refreshSidebarItems();
+  }
+
+  toggleSidebarEditMode() {
+    this.setSidebarEditMode(!this.sidebarEditMode);
+  }
+
+  bindTopbarActions() {
+    document
+      .querySelector('[data-action="clear-workspace"]')
+      ?.addEventListener("click", () => this.clearWorkspace());
+    document
+      .querySelector('[data-action="toggle-sidebar-edit"]')
+      ?.addEventListener("click", () => this.toggleSidebarEditMode());
+  }
+
   cleanup() {
     if (this.currentDraggedItem) {
       this.currentDraggedItem.style.transition =
@@ -404,6 +510,7 @@ class ItemManager {
   handleSidebarClick(e) {
     if (this.isDragging) return;
     e.preventDefault();
+    if (this.sidebarEditMode) return;
 
     const workspaceRect = this.workspace.getBoundingClientRect();
     const pos =
@@ -423,6 +530,7 @@ class ItemManager {
 
   handleSidebarMouseDown(e) {
     e.preventDefault();
+    if (this.sidebarEditMode) return;
     this.hasDragged = false;
 
     const clone = e.currentTarget.cloneNode(true);
@@ -475,14 +583,8 @@ class ItemManager {
       return;
     }
 
-    document
-      .querySelectorAll(`${this.sidenavSelector} .item`)
-      .forEach((item) => {
-        item.addEventListener("mousedown", (e) =>
-          this.handleSidebarMouseDown(e),
-        );
-        item.addEventListener("click", (e) => this.handleSidebarClick(e));
-      });
+    this.refreshSidebarItems();
+    this.bindTopbarActions();
 
     const searchInput = document.querySelector('.searchbar input[type="text"]');
     if (searchInput) {
@@ -511,6 +613,12 @@ class ItemManager {
   }
 
   clearAll() {
+    this.clearWorkspace();
+  }
+
+  clearWorkspace() {
+    this.pendingJobs.forEach(({ pollInterval }) => clearInterval(pollInterval));
+    this.pendingJobs.clear();
     this.allSpawnedItems.forEach((item) => item.remove());
     this.allSpawnedItems.clear();
   }
