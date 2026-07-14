@@ -10,6 +10,7 @@ from schemas.parent import ParentSchema
 from core.db.repositories.item import ItemRepository
 
 from core.llm.model import OpenAI
+from core.llm.parser import LLMOutputError, parse_llm_item
 
 from core.db.settings import db_settings
 from core.llm.settings import llm_settings
@@ -29,18 +30,16 @@ async def generate_task(
     session_factory = ctx["session_factory"]
 
     logger.info(f"Generating {prompt}")
-    result = await openai_client.generate(prompt)
-    if not result:
+    if not (result := await openai_client.generate(prompt)):
         raise Exception("Empty LLM response")
 
     try:
-        emoji, text = result.split(maxsplit=1)
-    except ValueError:
-        emoji = result[0]
-        text = result[1:]
+        generated = parse_llm_item(result)
+    except LLMOutputError as e:
+        raise ValueError(f"Invalid LLM response: {e}") from e
 
     parent = ParentSchema(first=first, second=second)
-    item = ItemSchema(emoji=emoji, text=text, parents=[parent])
+    item = ItemSchema(emoji=generated.emoji, text=generated.text, parents=[parent])
 
     async with session_factory() as session:
         repository = ItemRepository(session)
@@ -56,6 +55,7 @@ async def startup(ctx: dict[str, Any]) -> None:
     ctx["engine"] = engine
     ctx["session_factory"] = async_sessionmaker(engine, expire_on_commit=False)
     ctx["openai_client"] = OpenAI(
+        model=llm_settings.llm_model,
         base_url=llm_settings.llm_base_url,
         api_key=llm_settings.open_ai_api_key,
         max_tokens=llm_settings.max_tokens,
@@ -65,8 +65,7 @@ async def startup(ctx: dict[str, Any]) -> None:
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
-    engine = ctx.get("engine")
-    if engine:
+    if engine := ctx.get("engine"):
         await engine.dispose()
     logger.info("ARQ worker shutdown")
 
@@ -79,4 +78,6 @@ class WorkerSettings:
     redis_settings = RedisSettings(
         host=redis_settings.redis_host,
         port=redis_settings.redis_port,
+        database=redis_settings.redis_db,
+        password=redis_settings.redis_password or None,
     )

@@ -28,7 +28,7 @@ BASE_ELEMENTS: list[BaseElement] = [
 
 
 async def prepopulate() -> None:
-    logger.info(f"Prepopulating {db_settings.db_url} with default elements.")
+    logger.info("Prepopulating database with default elements.")
 
     engine = create_async_engine(str(db_settings.db_url))
     session_factory = async_sessionmaker(engine, expire_on_commit=False)

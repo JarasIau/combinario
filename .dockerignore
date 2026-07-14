@@ -15,4 +15,5 @@ Dockerfile
 **/venv/
 **/.venv/
 
+.env
 .env.example
