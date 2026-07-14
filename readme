@@ -8,10 +8,6 @@ This is an attempt of making an open source implementation of Infinite Craft by 
 Run via Docker:
     docker compose up
 Poetry is a preffered package manager if testing locally.
-requirements is present if you want to ignore docker and run everything manually for some reason.
-
-Stack:
-    Runs on llama.cpp server, FastAPI for backend, arq for jobs, SQLAlchemy for ORM queries to postgres and pydantic for data validation.
 
 LLM notes:
     The recommended model for local generation is Meta Llama 3.1 8B Instruct Q6_K.

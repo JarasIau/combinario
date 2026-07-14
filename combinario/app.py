@@ -1,14 +1,12 @@
 import logging
 import orjson
 from http import HTTPStatus
-from pathlib import Path
+from pathlib import Path as FilePath
 from arq import create_pool
-from arq.jobs import Job, JobStatus
-from arq.connections import RedisSettings, ArqRedis
-from typing import AsyncGenerator, Union, Any
+from typing import Annotated, AsyncGenerator, Union, Any
 from contextlib import asynccontextmanager, AsyncExitStack
 
-from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi import FastAPI, Request, HTTPException, Response, Path
 from fastapi.responses import HTMLResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -19,7 +17,7 @@ from schemas.combination import (
     CombinationResponse,
     CombinationStatus,
 )
-from schemas.item import ItemSchema
+from schemas.item import ItemCombinationRequest, ItemSchema
 from schemas.job import JobSchema
 from schemas.task import TaskResponse
 
@@ -27,6 +25,7 @@ from core.redis.dependencies import RedisDep
 from core.db.dependencies import ItemRepoDep
 from core.db.exceptions import ItemDoesNotExistError
 from services.combinations import CombinationService
+from services.jobs import JobNotFoundError, JobResultError, JobService
 
 from core.db.settings import db_settings
 from core.redis.settings import redis_settings
@@ -34,7 +33,8 @@ from core.redis.settings import redis_settings
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = FilePath(__file__).resolve().parent
+ItemIdPath = Annotated[int, Path(ge=1)]
 
 
 @asynccontextmanager
@@ -49,13 +49,7 @@ async def db_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 @asynccontextmanager
 async def redis_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    redis_conn = RedisSettings(
-        host=redis_settings.redis_host,
-        port=redis_settings.redis_port,
-        database=redis_settings.redis_db,
-        password=redis_settings.redis_password or None,
-    )
-    app.state.arq_pool: ArqRedis = await create_pool(redis_conn)  # type: ignore
+    app.state.arq_pool = await create_pool(redis_settings.as_arq_settings())
     try:
         yield
     finally:
@@ -89,14 +83,34 @@ async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="index.html")
 
 
-@app.get("/items/{first}/{second}", response_model=Union[ItemSchema, JobSchema])
+@app.post("/items", response_model=Union[ItemSchema, JobSchema])
+async def create_item(
+    payload: ItemCombinationRequest,
+    repository: ItemRepoDep,
+    arq_pool: RedisDep,
+) -> Union[ItemSchema, JobSchema]:
+    result = await _combine_items(
+        payload.first_id, payload.second_id, repository, arq_pool
+    )
+    return _legacy_item_response(result)
+
+
+@app.get(
+    "/items/{first}/{second}",
+    response_model=Union[ItemSchema, JobSchema],
+    deprecated=True,
+)
 async def fetch_item(
-    first: int,
-    second: int,
+    first: ItemIdPath,
+    second: ItemIdPath,
     repository: ItemRepoDep,
     arq_pool: RedisDep,
 ) -> Union[ItemSchema, JobSchema]:
     result = await _combine_items(first, second, repository, arq_pool)
+    return _legacy_item_response(result)
+
+
+def _legacy_item_response(result: CombinationResponse) -> Union[ItemSchema, JobSchema]:
     if result.status == CombinationStatus.READY and result.item is not None:
         return result.item
     if result.status == CombinationStatus.PENDING and result.job_id is not None:
@@ -124,16 +138,11 @@ async def create_combination(
 
 @app.get("/api/combinations/{first}/{second}", response_model=ItemSchema)
 async def fetch_combination(
-    first: int,
-    second: int,
+    first: ItemIdPath,
+    second: ItemIdPath,
     repository: ItemRepoDep,
     arq_pool: RedisDep,
 ) -> ItemSchema:
-    if first < 1 or second < 1:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST, detail="IDs must be >= 1"
-        )
-
     service = CombinationService(repository=repository, arq_pool=arq_pool)
     try:
         return await service.get_existing(first, second)
@@ -149,11 +158,6 @@ async def _combine_items(
     repository: ItemRepoDep,
     arq_pool: RedisDep,
 ) -> CombinationResponse:
-    if first < 1 or second < 1:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST, detail="IDs must be >= 1"
-        )
-
     service = CombinationService(repository=repository, arq_pool=arq_pool)
     try:
         return await service.combine(first, second)
@@ -180,24 +184,15 @@ async def fetch_job(job_id: str, arq_pool: RedisDep) -> TaskResponse:
 
 
 async def _fetch_task(job_id: str, arq_pool: RedisDep) -> TaskResponse:
-    job = Job(job_id=job_id, redis=arq_pool)
-    status = await job.status()
-
-    if status == JobStatus.not_found:
+    service = JobService(arq_pool)
+    try:
+        return await service.fetch(job_id)
+    except JobNotFoundError:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Job not found")
-
-    if status == JobStatus.complete:
-        try:
-            return TaskResponse(
-                status="complete", item=ItemSchema.model_validate(await job.result())
-            )
-        except Exception as e:
-            logger.error("Failed to retrieve result for job %s: %s", job_id, e)
-            raise HTTPException(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Job failed"
-            )
-
-    return TaskResponse(status=status.value)
+    except JobResultError:
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Job failed"
+        )
 
 
 @app.get("/health")

@@ -1,7 +1,6 @@
 import logging
 from typing import Any
 
-from arq.connections import RedisSettings
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from schemas.item import ItemSchema
@@ -75,9 +74,4 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
 
-    redis_settings = RedisSettings(
-        host=redis_settings.redis_host,
-        port=redis_settings.redis_port,
-        database=redis_settings.redis_db,
-        password=redis_settings.redis_password or None,
-    )
+    redis_settings = redis_settings.as_arq_settings()
