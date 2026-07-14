@@ -1,4 +1,4 @@
-combinario – merge two words and let AI create a brand-new concept using a locally hosted model.
+combinario – merge two words and let AI create a brand-new concept using a locally hosted LLM.
 
 Project is work in progress.
 
@@ -7,7 +7,12 @@ This is an attempt of making an open source implementation of Infinite Craft by 
 
 Run via Docker:
     docker compose up
-Poetry is a preffered package manager if testing locally.
+    OR
+    make docker-up
+
+Memory constraints:
+Since the model is hosted locally, in order to run everything smoothly, your machine would have to have at least 16GB RAM.
+You can try to run it with smaller models or better quantized versions, but expect, that output quality will also drop.
 
 LLM notes:
     The recommended model for local generation is Meta Llama 3.1 8B Instruct Q6_K.
