@@ -48,14 +48,24 @@ class ItemManager {
 
   async combineItems(firstId, secondId) {
     try {
-      const response = await fetch(`/items/${firstId}/${secondId}`);
+      const response = await fetch("/api/combinations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ first_id: firstId, second_id: secondId }),
+      });
       const data = await response.json();
 
-      if (data.enqueued) {
-        return { jobId: data.enqueued };
-      } else {
-        return { item: data };
+      if (!response.ok) {
+        return null;
       }
+
+      if (data.status === "pending") {
+        return { jobId: data.job_id };
+      } else if (data.status === "ready") {
+        return { item: data.item };
+      }
+
+      return null;
     } catch (error) {
       console.error("Error combining items:", error);
       return null;
@@ -64,11 +74,15 @@ class ItemManager {
 
   async pollJob(jobId) {
     try {
-      const response = await fetch(`/task/${jobId}`);
+      const response = await fetch(`/api/jobs/${jobId}`);
       const data = await response.json();
 
+      if (!response.ok) {
+        return { done: true, error: true };
+      }
+
       if (data.status === "complete") {
-        return { done: true, item: data.result };
+        return { done: true, item: data.item };
       } else if (data.status === "failed") {
         return { done: true, error: true };
       } else {

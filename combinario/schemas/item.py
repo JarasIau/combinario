@@ -8,4 +8,4 @@ class ItemSchema(BaseModel):
     id: int | None = Field(default=None, ge=0)
     emoji: str = Field(..., min_length=1)
     text: str = Field(..., min_length=1)
-    parents: list[ParentSchema] = []
+    parents: list[ParentSchema] = Field(default_factory=list)
