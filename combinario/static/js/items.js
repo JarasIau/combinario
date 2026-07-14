@@ -6,12 +6,17 @@ class ItemManager {
       SPACING: 140,
       DEBOUNCE_MS: 150,
       POLL_INTERVAL: 1000,
+      DRAG_THRESHOLD: 6,
       BASE_ITEM_IDS: new Set(["1", "2", "3", "4"]),
     };
 
     this.isDragging = false;
     this.hasDragged = false;
     this.currentDraggedItem = null;
+    this.dragSourceItem = null;
+    this.suppressNextSidebarClick = false;
+    this.pointerStartX = 0;
+    this.pointerStartY = 0;
     this.offsetX = 0;
     this.offsetY = 0;
     this.allSpawnedItems = new Set();
@@ -23,8 +28,9 @@ class ItemManager {
     this.workspace = null;
     this.sidenav = null;
 
-    this.handleMouseMove = this.handleMouseMove.bind(this);
-    this.handleMouseUp = this.handleMouseUp.bind(this);
+    this.handlePointerMove = this.handlePointerMove.bind(this);
+    this.handlePointerUp = this.handlePointerUp.bind(this);
+    this.handlePointerCancel = this.handlePointerCancel.bind(this);
   }
 
   debounce(fn, ms) {
@@ -46,6 +52,10 @@ class ItemManager {
       rect1.bottom < rect2.top ||
       rect1.top > rect2.bottom
     );
+  }
+
+  isMobileLayout() {
+    return window.matchMedia("(max-width: 760px)").matches;
   }
 
   async combineItems(firstId, secondId) {
@@ -313,8 +323,23 @@ class ItemManager {
     }
   }
 
-  handleMouseMove(e) {
+  prepareWorkspaceItem(item) {
+    item.querySelector(".sidebar-remove")?.remove();
+    item.classList.remove("is-removable");
+    item.removeAttribute("data-sidebar-ready");
+    item.removeAttribute("draggable");
+  }
+
+  handlePointerMove(e) {
     if (!this.isDragging || !this.currentDraggedItem) return;
+
+    const moved =
+      Math.abs(e.clientX - this.pointerStartX) > this.CONFIG.DRAG_THRESHOLD ||
+      Math.abs(e.clientY - this.pointerStartY) > this.CONFIG.DRAG_THRESHOLD;
+
+    if (!this.hasDragged && !moved) {
+      return;
+    }
 
     this.hasDragged = true;
     this.currentDraggedItem.style.left = e.clientX - this.offsetX + "px";
@@ -348,14 +373,19 @@ class ItemManager {
     }
   }
 
-  handleMouseUp(e) {
+  handlePointerUp(e) {
     if (!this.isDragging || !this.currentDraggedItem) return;
 
     const itemToCheck = this.currentDraggedItem;
+    const dragSourceItem = this.dragSourceItem;
 
     if (!this.hasDragged) {
       this.currentDraggedItem.remove();
       this.cleanup();
+      if (dragSourceItem && !this.sidebarEditMode) {
+        this.suppressNextSidebarClick = true;
+        this.spawnFromSidebarItem(dragSourceItem);
+      }
       return;
     }
 
@@ -373,28 +403,29 @@ class ItemManager {
       this.currentDraggedItem.remove();
       this.allSpawnedItems.delete(this.currentDraggedItem);
     } else {
-      const itemRect = this.currentDraggedItem.getBoundingClientRect();
-      const workspaceRect = this.workspace.getBoundingClientRect();
-
-      this.workspace.appendChild(this.currentDraggedItem);
-      this.currentDraggedItem.style.left =
-        itemRect.left - workspaceRect.left + "px";
-      this.currentDraggedItem.style.top =
-        itemRect.top - workspaceRect.top + "px";
-      this.currentDraggedItem.style.zIndex = "";
-      this.currentDraggedItem.style.pointerEvents = "auto";
-
-      if (!this.currentDraggedItem.dataset.initialized) {
-        this.currentDraggedItem.dataset.initialized = "true";
-        this.currentDraggedItem.style.transition =
-          "border-color 0.2s, transform 0.2s";
-        this.makeSpawnedItemDraggable(this.currentDraggedItem);
-      }
-      this.allSpawnedItems.add(this.currentDraggedItem);
+      this.placeDraggedItemInWorkspace(this.currentDraggedItem);
       this.checkCollisions(itemToCheck);
     }
 
     this.cleanup();
+  }
+
+  placeDraggedItemInWorkspace(item) {
+    const itemRect = item.getBoundingClientRect();
+    const workspaceRect = this.workspace.getBoundingClientRect();
+
+    this.workspace.appendChild(item);
+    item.style.left = itemRect.left - workspaceRect.left + "px";
+    item.style.top = itemRect.top - workspaceRect.top + "px";
+    item.style.zIndex = "";
+    item.style.pointerEvents = "auto";
+
+    if (!item.dataset.initialized) {
+      item.dataset.initialized = "true";
+      item.style.transition = "border-color 0.2s, transform 0.2s";
+      this.makeSpawnedItemDraggable(item);
+    }
+    this.allSpawnedItems.add(item);
   }
 
   isBaseSidebarItem(item) {
@@ -428,7 +459,7 @@ class ItemManager {
     svg.append(firstPath, secondPath);
     button.appendChild(svg);
 
-    button.addEventListener("mousedown", (e) => {
+    button.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       e.stopPropagation();
     });
@@ -443,7 +474,9 @@ class ItemManager {
 
   setupSidebarItem(item) {
     if (!item.dataset.sidebarReady) {
-      item.addEventListener("mousedown", (e) => this.handleSidebarMouseDown(e));
+      item.addEventListener("pointerdown", (e) =>
+        this.handleSidebarPointerDown(e),
+      );
       item.addEventListener("click", (e) => this.handleSidebarClick(e));
       item.dataset.sidebarReady = "true";
     }
@@ -503,23 +536,46 @@ class ItemManager {
     this.isDragging = false;
     this.hasDragged = false;
     this.currentDraggedItem = null;
-    document.removeEventListener("mousemove", this.handleMouseMove);
-    document.removeEventListener("mouseup", this.handleMouseUp);
+    this.dragSourceItem = null;
+    this.pointerStartX = 0;
+    this.pointerStartY = 0;
+    document.removeEventListener("pointermove", this.handlePointerMove);
+    document.removeEventListener("pointerup", this.handlePointerUp);
+    document.removeEventListener("pointercancel", this.handlePointerCancel);
+  }
+
+  handlePointerCancel() {
+    if (this.currentDraggedItem && this.dragSourceItem) {
+      this.currentDraggedItem.remove();
+    } else if (this.currentDraggedItem) {
+      this.placeDraggedItemInWorkspace(this.currentDraggedItem);
+    }
+    this.cleanup();
   }
 
   handleSidebarClick(e) {
+    if (this.suppressNextSidebarClick) {
+      this.suppressNextSidebarClick = false;
+      e.preventDefault();
+      return;
+    }
     if (this.isDragging) return;
     e.preventDefault();
     if (this.sidebarEditMode) return;
 
+    this.spawnFromSidebarItem(e.currentTarget);
+  }
+
+  spawnFromSidebarItem(item) {
     const workspaceRect = this.workspace.getBoundingClientRect();
     const pos =
       this.allSpawnedItems.size === 0
         ? { x: workspaceRect.width / 2 - 60, y: workspaceRect.height / 2 - 19 }
         : this.findNearbyEmptyPosition();
 
-    const clone = e.currentTarget.cloneNode(true);
+    const clone = item.cloneNode(true);
     clone.className = "item spawned-item";
+    this.prepareWorkspaceItem(clone);
     clone.style.cssText = `position:absolute;left:${pos.x}px;top:${pos.y}px;width:${this.CONFIG.ITEM_WIDTH}px;cursor:move;transition:border-color 0.2s, transform 0.2s;margin:0;padding:12px 15px;box-sizing:border-box`;
     clone.dataset.initialized = "true";
 
@@ -528,27 +584,34 @@ class ItemManager {
     this.makeSpawnedItemDraggable(clone);
   }
 
-  handleSidebarMouseDown(e) {
+  handleSidebarPointerDown(e) {
+    if (this.isMobileLayout()) return;
+
     e.preventDefault();
     if (this.sidebarEditMode) return;
     this.hasDragged = false;
 
     const clone = e.currentTarget.cloneNode(true);
     clone.className = "item spawned-item";
+    this.prepareWorkspaceItem(clone);
     clone.style.cssText = `position:absolute;left:${e.clientX - 60}px;top:${e.clientY - 19}px;width:${this.CONFIG.ITEM_WIDTH}px;cursor:move;pointer-events:none;z-index:1000`;
 
     document.body.appendChild(clone);
     this.currentDraggedItem = clone;
+    this.dragSourceItem = e.currentTarget;
     this.offsetX = 60;
     this.offsetY = 19;
+    this.pointerStartX = e.clientX;
+    this.pointerStartY = e.clientY;
     this.isDragging = true;
 
-    document.addEventListener("mousemove", this.handleMouseMove);
-    document.addEventListener("mouseup", this.handleMouseUp);
+    document.addEventListener("pointermove", this.handlePointerMove);
+    document.addEventListener("pointerup", this.handlePointerUp);
+    document.addEventListener("pointercancel", this.handlePointerCancel);
   }
 
   makeSpawnedItemDraggable(item) {
-    item.addEventListener("mousedown", (e) => {
+    item.addEventListener("pointerdown", (e) => {
       e.preventDefault();
 
       item.style.transition = "none";
@@ -568,9 +631,13 @@ class ItemManager {
       this.offsetX = e.clientX - rect.left;
       this.offsetY = e.clientY - rect.top;
       this.currentDraggedItem = item;
+      this.dragSourceItem = null;
+      this.pointerStartX = e.clientX;
+      this.pointerStartY = e.clientY;
       this.isDragging = true;
-      document.addEventListener("mousemove", this.handleMouseMove);
-      document.addEventListener("mouseup", this.handleMouseUp);
+      document.addEventListener("pointermove", this.handlePointerMove);
+      document.addEventListener("pointerup", this.handlePointerUp);
+      document.addEventListener("pointercancel", this.handlePointerCancel);
     });
   }
 
