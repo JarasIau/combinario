@@ -1,5 +1,6 @@
 import logging
 import orjson
+from http import HTTPStatus
 from arq import create_pool
 from arq.jobs import Job, JobStatus
 from arq.connections import RedisSettings, ArqRedis
@@ -85,7 +86,9 @@ async def fetch_item(
     arq_pool: RedisDep,
 ) -> Union[ItemSchema, JobSchema]:
     if first < 1 or second < 1:
-        raise HTTPException(status_code=422, detail="IDs must be >= 1")
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST, detail="IDs must be >= 1"
+        )
 
     parent = ParentSchema(first=first, second=second)
     try:
@@ -99,12 +102,16 @@ async def fetch_item(
             first_item = ItemSchema.model_validate(await repository.get_item(first))
             second_item = ItemSchema.model_validate(await repository.get_item(second))
         except ItemDoesNotExistError:
-            raise HTTPException(status_code=404, detail="Item not found")
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND, detail="Item not found"
+            )
 
     prompt = f"{first_item.text} + {second_item.text}"
     job = await arq_pool.enqueue_job("generate_task", prompt, first, second)
     if not job:
-        raise HTTPException(status_code=500, detail="Failed to enqueue job")
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to enqueue job"
+        )
     return JobSchema(enqueued=job.job_id)
 
 
@@ -114,14 +121,16 @@ async def fetch_task(job_id: str, arq_pool: RedisDep) -> dict[str, Any]:
     status = await job.status()
 
     if status == JobStatus.not_found:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Job not found")
 
     if status == JobStatus.complete:
         try:
             return {"status": "complete", "result": await job.result()}
         except Exception as e:
             logger.error("Failed to retrieve result for job %s: %s", job_id, e)
-            raise HTTPException(status_code=500, detail="Job failed")
+            raise HTTPException(
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Job failed"
+            )
 
     return {"status": status.value}
 
