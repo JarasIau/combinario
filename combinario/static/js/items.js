@@ -679,10 +679,6 @@ class ItemManager {
     }, 60000);
   }
 
-  clearAll() {
-    this.clearWorkspace();
-  }
-
   clearWorkspace() {
     this.pendingJobs.forEach(({ pollInterval }) => clearInterval(pollInterval));
     this.pendingJobs.clear();

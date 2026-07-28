@@ -1,5 +1,5 @@
 from typing import List
-from sqlalchemy import String, ForeignKey, UniqueConstraint, CheckConstraint, Index
+from sqlalchemy import String, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import DeclarativeBase, mapped_column, relationship, Mapped
 from sqlalchemy.ext.asyncio import AsyncAttrs
 
@@ -29,7 +29,6 @@ class Parent(Base):
         UniqueConstraint("item_id", "first", "second"),
         UniqueConstraint("first", "second", name="uq_parent_first_second"),
         CheckConstraint("first <= second"),  # just a safety net
-        Index("idx_first_second", "first", "second"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

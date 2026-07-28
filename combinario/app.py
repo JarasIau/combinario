@@ -1,13 +1,12 @@
 import logging
-import orjson
 from http import HTTPStatus
 from pathlib import Path as FilePath
 from arq import create_pool
-from typing import Annotated, AsyncGenerator, Union, Any
+from typing import Annotated, AsyncGenerator
 from contextlib import asynccontextmanager, AsyncExitStack
 
 from fastapi import FastAPI, Request, HTTPException, Response, Path
-from fastapi.responses import HTMLResponse, ORJSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -17,8 +16,7 @@ from schemas.combination import (
     CombinationResponse,
     CombinationStatus,
 )
-from schemas.item import ItemCombinationRequest, ItemSchema
-from schemas.job import JobSchema
+from schemas.item import ItemSchema
 from schemas.task import TaskResponse
 
 from core.redis.dependencies import RedisDep
@@ -66,8 +64,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     lifespan=lifespan,
-    json_loads=orjson.loads,
-    default_response_class=ORJSONResponse,
     debug=db_settings.debug_mode,
     docs_url="/docs" if db_settings.debug_mode else None,
     redoc_url=None,
@@ -81,44 +77,6 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="index.html")
-
-
-@app.post("/items", response_model=Union[ItemSchema, JobSchema])
-async def create_item(
-    payload: ItemCombinationRequest,
-    repository: ItemRepoDep,
-    arq_pool: RedisDep,
-) -> Union[ItemSchema, JobSchema]:
-    result = await _combine_items(
-        payload.first_id, payload.second_id, repository, arq_pool
-    )
-    return _legacy_item_response(result)
-
-
-@app.get(
-    "/items/{first}/{second}",
-    response_model=Union[ItemSchema, JobSchema],
-    deprecated=True,
-)
-async def fetch_item(
-    first: ItemIdPath,
-    second: ItemIdPath,
-    repository: ItemRepoDep,
-    arq_pool: RedisDep,
-) -> Union[ItemSchema, JobSchema]:
-    result = await _combine_items(first, second, repository, arq_pool)
-    return _legacy_item_response(result)
-
-
-def _legacy_item_response(result: CombinationResponse) -> Union[ItemSchema, JobSchema]:
-    if result.status == CombinationStatus.READY and result.item is not None:
-        return result.item
-    if result.status == CombinationStatus.PENDING and result.job_id is not None:
-        return JobSchema(enqueued=result.job_id)
-    raise HTTPException(
-        status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-        detail="Invalid combination response",
-    )
 
 
 @app.post("/api/combinations", response_model=CombinationResponse)
@@ -168,14 +126,6 @@ async def _combine_items(
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to enqueue job"
         )
-
-
-@app.get("/task/{job_id}")
-async def fetch_task(job_id: str, arq_pool: RedisDep) -> dict[str, Any]:
-    task = await _fetch_task(job_id, arq_pool)
-    if task.status == "complete":
-        return {"status": task.status, "result": task.item}
-    return {"status": task.status}
 
 
 @app.get("/api/jobs/{job_id}", response_model=TaskResponse)

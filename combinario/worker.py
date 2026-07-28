@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from schemas.item import ItemSchema
@@ -8,7 +9,6 @@ from schemas.parent import ParentSchema
 
 from core.db.repositories.item import ItemRepository
 
-from core.llm.model import OpenAI
 from core.llm.parser import LLMOutputError, parse_llm_item
 
 from core.db.settings import db_settings
@@ -17,6 +17,18 @@ from core.redis.settings import redis_settings
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
+SYSTEM_PROMPT = """You are a word-combining system.
+Input: two words or concepts.
+Task: produce exactly ONE combined result that merges both inputs.
+Output rules:
+- Output ONLY the combined result
+- One word or short phrase
+- Add ONLY ONE relevant emoji at the start
+- No explanation
+- No extra text
+- If the result cannot be generated return: ❌ Failed
+- Stop after the result.
+Example: Fire + Water → 💨Steam"""
 
 
 async def generate_task(
@@ -29,7 +41,16 @@ async def generate_task(
     session_factory = ctx["session_factory"]
 
     logger.info(f"Generating {prompt}")
-    if not (result := await openai_client.generate(prompt)):
+    response = await openai_client.chat.completions.create(
+        model=llm_settings.llm_model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=llm_settings.max_tokens,
+        temperature=llm_settings.model_temperature,
+    )
+    if not (result := response.choices[0].message.content):
         raise Exception("Empty LLM response")
 
     try:
@@ -53,12 +74,9 @@ async def startup(ctx: dict[str, Any]) -> None:
     engine = create_async_engine(str(db_settings.db_url), echo=db_settings.debug_mode)
     ctx["engine"] = engine
     ctx["session_factory"] = async_sessionmaker(engine, expire_on_commit=False)
-    ctx["openai_client"] = OpenAI(
-        model=llm_settings.llm_model,
+    ctx["openai_client"] = AsyncOpenAI(
         base_url=llm_settings.llm_base_url,
         api_key=llm_settings.open_ai_api_key,
-        max_tokens=llm_settings.max_tokens,
-        temperature=llm_settings.model_temperature,
     )
     logger.info("ARQ worker started")
 

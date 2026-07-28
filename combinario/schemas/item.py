@@ -9,8 +9,3 @@ class ItemSchema(BaseModel):
     emoji: str = Field(..., min_length=1)
     text: str = Field(..., min_length=1)
     parents: list[ParentSchema] = Field(default_factory=list)
-
-
-class ItemCombinationRequest(BaseModel):
-    first_id: int = Field(..., ge=1)
-    second_id: int = Field(..., ge=1)

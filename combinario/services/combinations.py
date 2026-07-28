@@ -1,4 +1,4 @@
-from typing import Any, Protocol
+from typing import Any
 
 from core.db.exceptions import ItemDoesNotExistError
 from schemas.combination import CombinationResponse, CombinationStatus
@@ -6,24 +6,8 @@ from schemas.item import ItemSchema
 from schemas.parent import ParentSchema
 
 
-class QueuedJob(Protocol):
-    job_id: str
-
-
-class ItemReader(Protocol):
-    async def get_item(self, item_id: int) -> object: ...
-
-    async def get_item_by_parents(self, first_id: int, second_id: int) -> object: ...
-
-
-class JobQueue(Protocol):
-    async def enqueue_job(
-        self, function: str, *args: Any, **kwargs: Any
-    ) -> QueuedJob | None: ...
-
-
 class CombinationService:
-    def __init__(self, repository: ItemReader, arq_pool: JobQueue):
+    def __init__(self, repository: Any, arq_pool: Any):
         self.repository = repository
         self.arq_pool = arq_pool
 

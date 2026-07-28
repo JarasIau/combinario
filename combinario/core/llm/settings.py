@@ -6,8 +6,6 @@ class LLMSettings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    debug_mode: bool = False
-
     llm_base_url: str
     llm_model: str
 
