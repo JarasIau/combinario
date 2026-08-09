@@ -6,3 +6,6 @@ venv/
 
 .ruff_cache/
 models/*.gguf
+
+migrations/
+node_modules/
