@@ -1,6 +1,6 @@
-combinario – merge two words and let AI create a brand-new concept using a locally hosted LLM.
+combinario - merge two words and let AI create a new concept.
 
-Project is work in progress.
+This project is pretty much done, I just wanted to mess around with locally hosted LLMs.
 
 This is an attempt of making an open source implementation of Infinite Craft by Neal Agarwal at:
     https://neal.fun/infinite-craft/
