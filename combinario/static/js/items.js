@@ -117,6 +117,19 @@ class ItemManager {
     element.appendChild(document.createTextNode(" " + text));
   }
 
+  setLoadingContent(element) {
+    element.textContent = "";
+
+    const clock = document.createElement("span");
+    clock.className = "loading-clock";
+    clock.textContent = "⏳";
+
+    const dots = document.createElement("span");
+    dots.className = "loading-dots";
+
+    element.append(clock, document.createTextNode(" Loading"), dots);
+  }
+
   startPolling(jobId, placeholder) {
     const pollInterval = setInterval(async () => {
       const result = await this.pollJob(jobId);
@@ -249,7 +262,7 @@ class ItemManager {
 
         const placeholder = document.createElement("div");
         placeholder.className = "item spawned-item";
-        placeholder.textContent = "⏳ Loading...";
+        this.setLoadingContent(placeholder);
         placeholder.style.cssText = `position:absolute;left:${placeholderX}px;top:${placeholderY}px;width:${this.CONFIG.ITEM_WIDTH}px;cursor:move;transition:border-color 0.2s, transform 0.2s`;
         placeholder.dataset.initialized = "true";
 

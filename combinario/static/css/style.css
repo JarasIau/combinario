@@ -213,6 +213,49 @@ body {
   touch-action: none;
 }
 
+.loading-clock {
+  display: inline-block;
+  margin-right: 0.25em;
+  animation: spin-clock 1.6s ease-in-out infinite;
+}
+
+.loading-dots {
+  display: inline-block;
+  width: 3ch;
+  text-align: left;
+}
+
+.loading-dots::after {
+  content: "...";
+  animation: loading-dots 1.2s steps(1, end) infinite;
+}
+
+@keyframes spin-clock {
+  0% {
+    transform: rotate(0turn);
+  }
+
+  45%,
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes loading-dots {
+  0%,
+  100% {
+    content: "...";
+  }
+
+  33% {
+    content: ".";
+  }
+
+  66% {
+    content: "..";
+  }
+}
+
 #stars-canvas {
   position: absolute;
   inset: 0;
